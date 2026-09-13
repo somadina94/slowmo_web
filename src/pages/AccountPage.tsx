@@ -24,6 +24,7 @@ export function AccountPage() {
   const user = useAppSelector((state) => state.auth.user);
   const { data = [] } = useMyOrders(Boolean(user));
   const navigate = useNavigate();
+  const pendingConsults = data.filter((order) => order.status === "consult" || order.status === "pending_payment");
   return (
     <DashboardShell groups={accountGroups}>
       <div className="space-y-6">
@@ -43,11 +44,31 @@ export function AccountPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardDescription>Latest status</CardDescription>
-              <CardTitle>{data[0] ? STATUS_LABEL[data[0].status] || data[0].status : "None yet"}</CardTitle>
+              <CardDescription>Pending consults</CardDescription>
+              <CardTitle>{pendingConsults.length}</CardTitle>
             </CardHeader>
           </Card>
         </div>
+        {pendingConsults.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending consultation</CardTitle>
+              <CardDescription>Orders waiting for a doctor consult or payment before confirmation.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {pendingConsults.map((order) => (
+                <Link
+                  key={order.public_id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 hover:bg-accent"
+                  to={`/account/orders/${order.public_id}`}
+                >
+                  <span className="font-mono text-sm">{order.public_id}</span>
+                  <span className="text-sm">{STATUS_LABEL[order.status]}</span>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
         <Card id="orders">
           <CardHeader>
             <CardTitle>Your orders</CardTitle>

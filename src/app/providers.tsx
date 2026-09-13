@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
+import { AuthBootstrap } from "../features/auth/AuthBootstrap";
 import { store } from "./store";
 
 export function createQueryClient() {
@@ -19,6 +20,7 @@ export function AppProviders({
     <Provider store={store}>
       <QueryClientProvider client={client}>
         <BrowserRouter>
+          <AuthBootstrap />
           {children}
           <Toaster richColors position="top-center" />
         </BrowserRouter>

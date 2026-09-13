@@ -10,10 +10,12 @@ test("auth slice", () => {
   const user = { id: 1, email: "a@b.com", name: "A", phone: "", role: "customer", initials: "A" };
   let state = authReducer(undefined, setSession({ user, accessToken: "a", refreshToken: "b" }));
   expect(state.accessToken).toBe("a");
+  expect(state.status).toBe("ready");
   state = authReducer(state, setUser(user));
   expect(state.user?.email).toBe("a@b.com");
   state = authReducer(state, clearSession());
   expect(state.user).toBeNull();
+  expect(state.status).toBe("ready");
 });
 
 test("checkout and ui slices", () => {

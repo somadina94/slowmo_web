@@ -103,7 +103,7 @@ afterEach(() => {
   delete (globalThis as { Razorpay?: unknown }).Razorpay;
 });
 
-beforeEach(() => {
+function mockApiDefaults() {
   mockedApi.get.mockImplementation(async (url: string) => {
     if (url === "/products")
       return {
@@ -115,7 +115,12 @@ beforeEach(() => {
       return { data: [{ key: "sleep30", name: "Sleep 30", description: "d", duration: "30", icon: "moon" }] };
     if (String(url).startsWith("/files/rx/")) return { data: new Blob(["img"], { type: "image/png" }) };
     if (url === "/orders")
-      return { data: [{ public_id: "SM-1", status: "mystery", total: 3390, ship_name: "Priya", ship_phone: "1" }] };
+      return {
+        data: [
+          { public_id: "SM-1", status: "consult", total: 3390, ship_name: "Priya", ship_phone: "1" },
+          { public_id: "SM-9", status: "weird-status", total: 3390, ship_name: "Priya", ship_phone: "1" },
+        ],
+      };
     if (url === "/orders/SM-404") throw new Error("missing");
     if (url === "/orders/SM-SLOW") return new Promise(() => undefined);
     if (url === "/orders/SM-2") return { data: sparseOrder };
@@ -133,6 +138,7 @@ beforeEach(() => {
       return {
         data: {
           greeting: "Good morning, Meera.",
+          pending_consults: 2,
           kpis: [
             { label: "A", value: "1", delta: "+1", type: "up" },
             { label: "B", value: "2", delta: "-1", type: "down" },
@@ -143,14 +149,31 @@ beforeEach(() => {
     if (String(url).includes("/admin/orders"))
       return { data: { orders: [{ id: "SM-1", name: "A", status: "weird", total: 1, city: "Bengaluru" }] } };
     if (String(url).includes("/admin/consults"))
-      return { data: { consults: [{ id: "SM-1", name: "A", phone: "1", note: "x" }] } };
+      return {
+        data: {
+          consults: [{ id: "SM-1", name: "A", phone: "1", note: "x" }],
+          pending_rx: [],
+          prescriptions: [],
+          remaining: 1,
+        },
+      };
     if (String(url).includes("/admin/dispatch"))
       return { data: { columns: [{ key: "packed", label: "Packed", cards: [{ id: "SM-1", name: "A", city: "X" }] }] } };
     if (String(url).includes("/admin/analytics")) return { data: { kpis: [{ label: "Rev", value: "1" }] } };
     if (String(url).includes("/admin/customers"))
       return { data: { customers: [{ name: "A", email: "a@b.com", city: "X" }] } };
     if (String(url).includes("/admin/inventory"))
-      return { data: { skus: [{ sku: "SM-MB-10", stock: 1, level: "hi" }], days_remaining: 18 } };
+      return {
+        data: {
+          skus: [
+            { sku: "SM-MB-10", name: "10 pack", stock: 1, level: "hi", allocated: 0 },
+            { sku: "SM-MB-15", stock: 2, level: "mid" },
+          ],
+          days_remaining: 18,
+          warehouse: "Bengaluru",
+          batches: [{ b: "BATCH-1", made: "Jan 1", exp: "Dec 1", qty: 5 }],
+        },
+      };
     if (String(url).includes("/admin/counts")) return { data: { orders: 2, consults: 1 } };
     return { data: {} };
   });
@@ -158,6 +181,10 @@ beforeEach(() => {
     data: { public_id: "SM-9", razorpay: null, id: 1, filename: "rx.pdf", result: "fit" },
   });
   mockedApi.patch.mockResolvedValue({ data: {} });
+}
+
+beforeEach(() => {
+  mockApiDefaults();
 });
 
 test("landing interactions", async () => {
@@ -356,6 +383,7 @@ test("auth pages", async () => {
 test("account and admin", async () => {
   renderApp("/account", "customer");
   expect(await screen.findByText("Your account")).toBeInTheDocument();
+  expect(await screen.findByText("Pending consultation")).toBeInTheDocument();
   fireEvent.click(screen.getByText("Priya Sharma"));
   fireEvent.click(screen.getByText("Toggle Sidebar"));
   fireEvent.click(screen.getByText("Log out"));
@@ -373,11 +401,46 @@ test("account and admin", async () => {
   fireEvent.click(screen.getByText("Dashboard"));
   renderApp("/admin", "founder");
   expect(await screen.findByText(/Good morning/)).toBeInTheDocument();
+  expect(await screen.findByText(/2 pending consult/)).toBeInTheDocument();
+  mockedApi.get.mockImplementation(async (url: string) => {
+    if (String(url).includes("/admin/overview"))
+      return {
+        data: { greeting: "Good morning, Meera.", pending_consults: 1, kpis: [], recent: [] },
+      };
+    if (String(url).includes("/admin/counts")) return { data: { orders: 0, consults: 1 } };
+    return { data: {} };
+  });
+  renderApp("/admin", "founder");
+  expect(await screen.findByText(/1 pending consult$/)).toBeInTheDocument();
+  mockApiDefaults();
   renderApp("/admin/orders", "founder");
   expect(await screen.findByText("Bengaluru")).toBeInTheDocument();
   fireEvent.click(await screen.findByText("hold"));
   renderApp("/admin/consults", "founder");
   fireEvent.click(await screen.findByText("Call now"));
+  mockedApi.get.mockImplementation(async (url: string) => {
+    if (String(url).includes("/admin/consults")) {
+      return {
+        data: {
+          consults: [],
+          pending_rx: [{ id: "SM-8", name: "Rx User", file: "rx.pdf", status: "pending_verify" }],
+          prescriptions: [{ id: "SM-7", name: "Done", rx: "RX-1", dose: "1/day", dur: "30 days", status: "Issued" }],
+          remaining: 0,
+        },
+      };
+    }
+    if (String(url).includes("/admin/counts")) return { data: { orders: 0, consults: 1 } };
+    return { data: {} };
+  });
+  renderApp("/admin/consults", "founder");
+  expect(await screen.findByText("No scheduled calls")).toBeInTheDocument();
+  expect(await screen.findByText("Rx User")).toBeInTheDocument();
+  expect(await screen.findByText("RX-1")).toBeInTheDocument();
+  fireEvent.click(screen.getByText("Review"));
+  mockedApi.get.mockRejectedValueOnce(new Error("forbidden"));
+  renderApp("/admin/consults", "founder");
+  expect(await screen.findByText(/Consult queue unavailable/)).toBeInTheDocument();
+  mockApiDefaults();
   renderApp("/admin/dispatch", "founder");
   expect(await screen.findByText("Packed")).toBeInTheDocument();
   expect(await screen.findByText("A")).toBeInTheDocument();
@@ -386,7 +449,54 @@ test("account and admin", async () => {
   renderApp("/admin/customers", "founder");
   expect(await screen.findByText("A · X")).toBeInTheDocument();
   renderApp("/admin/inventory", "founder");
-  expect(await screen.findByText(/SM-MB-10/)).toBeInTheDocument();
+  expect((await screen.findAllByText(/SM-MB-10/)).length).toBeGreaterThan(0);
+  expect(await screen.findByText(/exp Dec 1/)).toBeInTheDocument();
+  fireEvent.change(screen.getByPlaceholderText("SM-MB-45"), { target: { value: "SM-MB-45" } });
+  fireEvent.change(screen.getByPlaceholderText("Slow Mo · 45 pack"), { target: { value: "Slow Mo · 45 pack" } });
+  fireEvent.change(screen.getByPlaceholderText("Optional"), { target: { value: "Value" } });
+  const packField = screen
+    .getAllByDisplayValue("10")
+    .find((el) => el.closest("form")?.textContent?.includes("Create SKU"));
+  fireEvent.change(packField as HTMLElement, { target: { value: "45" } });
+  fireEvent.change(screen.getByDisplayValue("3390"), { target: { value: "12000" } });
+  fireEvent.change(screen.getByDisplayValue("3890"), { target: { value: "14000" } });
+  const stockFields = screen.getAllByDisplayValue("0");
+  fireEvent.change(stockFields[0], { target: { value: "8" } });
+  fireEvent.change(stockFields[1] || stockFields[0], { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Create SKU" }));
+  await waitFor(() =>
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      "/admin/inventory/skus",
+      expect.objectContaining({ sku: "SM-MB-45", pack_qty: 45 }),
+    ),
+  );
+  fireEvent.change(screen.getByPlaceholderText("SM-MB-45"), { target: { value: "BAD" } });
+  fireEvent.change(screen.getByPlaceholderText("Slow Mo · 45 pack"), { target: { value: "Bad" } });
+  const badPack = screen
+    .getAllByDisplayValue("45")
+    .find((el) => el.closest("form")?.textContent?.includes("Create SKU"));
+  fireEvent.change(badPack as HTMLElement, { target: { value: "nope" } });
+  fireEvent.change(screen.getByDisplayValue("12000"), { target: { value: "0" } });
+  fireEvent.change(screen.getByDisplayValue("14000"), { target: { value: "0" } });
+  fireEvent.click(screen.getByRole("button", { name: "Create SKU" }));
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "SM-MB-15" } });
+  const receiptQty = screen
+    .getAllByDisplayValue("10")
+    .find((el) => el.closest("form")?.textContent?.includes("Receive stock"));
+  fireEvent.change(receiptQty as HTMLElement, { target: { value: "5" } });
+  const batchInput = screen.getByPlaceholderText("B-2026-01");
+  fireEvent.change(batchInput, { target: { value: "BATCH-X" } });
+  fireEvent.change(batchInput, { target: { value: "" } });
+  fireEvent.change(screen.getByDisplayValue("manual receipt"), { target: { value: "restock" } });
+  fireEvent.click(screen.getByText("Receive stock"));
+  await waitFor(() => expect(mockedApi.post).toHaveBeenCalled());
+  fireEvent.change(screen.getByDisplayValue("5"), { target: { value: "0" } });
+  fireEvent.click(screen.getByText("Receive stock"));
+  fireEvent.click(screen.getByRole("button", { name: "Create SKU" }));
+  mockedApi.get.mockRejectedValueOnce(new Error("no inventory"));
+  renderApp("/admin/inventory", "founder");
+  expect(await screen.findByText(/Could not load inventory/)).toBeInTheDocument();
+  mockApiDefaults();
   renderApp("/admin/orders", "founder");
   fireEvent.click(await screen.findByRole("link", { name: "SM-1" }));
   expect(await screen.findByText("Shipping address")).toBeInTheDocument();
@@ -409,6 +519,7 @@ test("account and admin", async () => {
   renderApp("/account/orders/SM-1", "customer");
   expect(await screen.findByText("12 Church Street")).toBeInTheDocument();
   renderApp("/account", "customer");
+  expect(await screen.findByText("Pending consultation")).toBeInTheDocument();
   fireEvent.click(await screen.findByRole("link", { name: "SM-1" }));
   expect(await screen.findByText("Shipping address")).toBeInTheDocument();
   mockedApi.get.mockResolvedValue({ data: {} });

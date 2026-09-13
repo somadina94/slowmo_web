@@ -4,6 +4,7 @@ import {
   loginRequest,
   logoutRequest,
   meRequest,
+  refreshRequest,
   registerRequest,
   verifyLoginRequest,
   forgotPasswordRequest,
@@ -150,6 +151,9 @@ describe("lib", () => {
       if (config.url === "/fail") {
         return Promise.reject({ response: { status: 401 }, config, isAxiosError: true });
       }
+      if (config.url === "/silent-fail") {
+        return Promise.reject({ response: { status: 401 }, config: { ...config, silent: true }, isAxiosError: true });
+      }
       if (config.url === "/boom") {
         return Promise.reject({ response: { status: 500 }, config, isAxiosError: true });
       }
@@ -161,6 +165,7 @@ describe("lib", () => {
     await client.get("/ok");
     expect(calls[0]).toContain("Bearer tok");
     await expect(client.get("/fail")).rejects.toBeTruthy();
+    await expect(client.get("/silent-fail")).rejects.toBeTruthy();
     await expect(client.get("/boom")).rejects.toBeTruthy();
     await expect(client.get("/bare")).rejects.toBeTruthy();
     const bare = createApi("http://x", () => "");
@@ -207,6 +212,7 @@ describe("lib", () => {
       .mockResolvedValueOnce({ data: { message: "ok" } })
       .mockResolvedValueOnce({ data: { message: "ok" } })
       .mockResolvedValueOnce({ data: pair })
+      .mockResolvedValueOnce({ data: pair })
       .mockResolvedValueOnce({});
     (api.get as jest.Mock) = jest.fn().mockResolvedValue({ data: pair.user });
     await loginRequest("a@b.com", "x");
@@ -216,6 +222,7 @@ describe("lib", () => {
     await resetPasswordRequest("tok", "password1");
     await registerRequest({ email: "a@b.com", password: "x", name: "A" });
     await meRequest();
+    await refreshRequest("r");
     await logoutRequest("r");
     expect(api.post).toHaveBeenCalled();
   });

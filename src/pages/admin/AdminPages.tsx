@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { BarChart3, Boxes, Home, Phone, ShoppingCart, Truck, Users } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../app/store";
@@ -8,6 +9,7 @@ import { PendingIcon } from "../../components/PendingIcon";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { statusClass, STATUS_LABEL } from "../../lib/status";
 
@@ -49,14 +51,23 @@ export function StatusBadge({ status }: { status: string }) {
 export function AdminOverview() {
   const { data } = useAdminQuery<{
     greeting: string;
+    pending_consults?: number;
     kpis: { label: string; value: string; delta: string; type: string }[];
     recent: { id: string; name: string; status: string; total: number }[];
   }>(["admin-overview"], "/admin/overview");
+  const pending = data?.pending_consults ?? 0;
   return (
     <div className="space-y-6">
-      <div className="pt-1">
-        <h2 className="font-display text-2xl leading-tight">{data?.greeting || "Dashboard"}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Preorders, consults, and dispatch in one place.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3 pt-1">
+        <div>
+          <h2 className="font-display text-2xl leading-tight">{data?.greeting || "Dashboard"}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Preorders, consults, and dispatch in one place.</p>
+        </div>
+        <Button asChild variant={pending ? "default" : "outline"} size="sm">
+          <Link to="/admin/consults">
+            {pending} pending consult{pending === 1 ? "" : "s"}
+          </Link>
+        </Button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {(data?.kpis || []).map((kpi) => (
@@ -160,15 +171,128 @@ export function AdminOrders() {
 }
 
 export function AdminConsults() {
-  const { data } = useAdminQuery<{ consults: { id: string; name: string; phone: string; note: string }[] }>(
-    ["admin-consults"],
-    "/admin/consults",
-  );
+  const { data, isError, isLoading } = useAdminQuery<{
+    consults: { id: string; name: string; phone: string; note: string; time?: string }[];
+    pending_rx?: { id: string; name: string; file: string; status: string }[];
+    prescriptions?: { id: string; name: string; rx: string; dose: string; dur: string; status: string }[];
+    remaining?: number;
+  }>(["admin-consults"], "/admin/consults");
+  const consults = data?.consults || [];
+  const pendingRx = data?.pending_rx || [];
+  const prescriptions = data?.prescriptions || [];
+  const remaining = data?.remaining ?? consults.length;
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading consult queue…</p>;
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Consult queue unavailable</CardTitle>
+          <CardDescription>
+            Your role may not include consult access (founder, admin, or clinician required), or the API failed.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      {(data?.consults || []).map((row) => (
-        <ConsultRow key={row.id} row={row} />
-      ))}
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-2xl">Consult queue</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {remaining} call{remaining === 1 ? "" : "s"} remaining
+          {pendingRx.length ? ` · ${pendingRx.length} Rx to verify` : ""}
+        </p>
+      </div>
+
+      {consults.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No scheduled calls</CardTitle>
+            <CardDescription>
+              Booked consults with status “Pending consult” appear here. Orders that uploaded a prescription instead
+              show under Rx verification below.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {consults.map((row) => (
+            <ConsultRow key={row.id} row={row} />
+          ))}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rx verification</CardTitle>
+          <CardDescription>Prescription uploads waiting for clinician review.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {pendingRx.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No prescriptions pending verification.</p>
+          ) : (
+            pendingRx.map((row) => (
+              <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                <div>
+                  <Link className="font-medium underline-offset-4 hover:underline" to={`/admin/orders/${row.id}`}>
+                    {row.name}
+                  </Link>
+                  <div className="font-mono text-xs text-muted-foreground">
+                    {row.id} · {row.file}
+                  </div>
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link to={`/admin/orders/${row.id}`}>Review</Link>
+                </Button>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Prescriptions issued</CardTitle>
+          <CardDescription>Recent clinician prescriptions on orders.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {prescriptions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None issued yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Patient</TableHead>
+                  <TableHead>Rx</TableHead>
+                  <TableHead>Dose</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {prescriptions.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-mono">
+                      <Link className="underline-offset-4 hover:underline" to={`/admin/orders/${row.id}`}>
+                        {row.id}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.rx}</TableCell>
+                    <TableCell>{row.dose}</TableCell>
+                    <TableCell>{row.status}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -268,24 +392,213 @@ export function AdminCustomers() {
 }
 
 export function AdminInventory() {
-  const { data } = useAdminQuery<{ skus: { sku: string; stock: number; level: string }[]; days_remaining: number }>(
-    ["admin-inventory"],
-    "/admin/inventory",
-  );
+  const { data, isError } = useAdminQuery<{
+    skus: { sku: string; name?: string; stock: number; allocated?: number; level: string; days?: number }[];
+    batches?: { b: string; made: string; exp: string; qty: number }[];
+    days_remaining: number;
+    warehouse?: string;
+  }>(["admin-inventory"], "/admin/inventory");
+  const receive = useAdminMutation("/admin/inventory/receipts", ["admin-inventory"], "Stock received");
+  const createSku = useAdminMutation("/admin/inventory/skus", ["admin-inventory"], "SKU created");
+  const [sku, setSku] = useState("");
+  const [qty, setQty] = useState("10");
+  const [batch, setBatch] = useState("");
+  const [note, setNote] = useState("manual receipt");
+  const [newCode, setNewCode] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPack, setNewPack] = useState("10");
+  const [newPrice, setNewPrice] = useState("3390");
+  const [newMrp, setNewMrp] = useState("3890");
+  const [newLabel, setNewLabel] = useState("");
+  const [newStock, setNewStock] = useState("0");
+  const [newForecast, setNewForecast] = useState("0");
+
+  const skus = data?.skus || [];
+  const selectedSku = sku || skus[0]?.sku || "";
+
+  const submitReceipt = (event: FormEvent) => {
+    event.preventDefault();
+    const amount = Number(qty);
+    if (!selectedSku || !Number.isFinite(amount) || amount <= 0) return;
+    void receive.mutateAsync({
+      sku: selectedSku,
+      qty: amount,
+      note,
+      batch_code: batch || null,
+    });
+  };
+
+  const submitCreate = (event: FormEvent) => {
+    event.preventDefault();
+    const packQty = Number(newPack) || 0;
+    const price = Number(newPrice) || 0;
+    const mrp = Number(newMrp) || 0;
+    const stock = Number(newStock) || 0;
+    const forecast = Number(newForecast) || 0;
+    if (!newCode.trim() || !newName.trim() || packQty <= 0) return;
+    void createSku
+      .mutateAsync({
+        sku: newCode.trim(),
+        name: newName.trim(),
+        pack_qty: packQty,
+        price,
+        mrp,
+        label: newLabel.trim(),
+        stock,
+        weekly_forecast: forecast,
+      })
+      .then(() => {
+        setNewCode("");
+        setNewName("");
+        setNewLabel("");
+        setNewStock("0");
+        setNewForecast("0");
+      });
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Inventory</CardTitle>
-        <CardDescription>On-hand stock and cover.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {(data?.skus || []).map((sku) => (
-          <div key={sku.sku}>
-            {sku.sku} · {sku.stock} · {sku.level}
-          </div>
-        ))}
-        <p>Stock lasts {data?.days_remaining ?? 0} days.</p>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Inventory</CardTitle>
+          <CardDescription>
+            {data?.warehouse ? `Warehouse: ${data.warehouse}` : "On-hand stock and cover."}
+            {isError ? " · Could not load inventory (ops/admin/founder required)." : ""}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {skus.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No SKUs yet.</p>
+          ) : (
+            skus.map((row) => (
+              <div
+                key={row.sku}
+                className="flex flex-wrap items-baseline justify-between gap-2 border-b py-2 last:border-0"
+              >
+                <div>
+                  <div className="font-medium">{row.name || row.sku}</div>
+                  <div className="font-mono text-xs text-muted-foreground">{row.sku}</div>
+                </div>
+                <div className="text-right text-sm">
+                  <div className="font-display text-xl">{row.stock}</div>
+                  <div className="text-muted-foreground">
+                    {row.level}
+                    {row.allocated != null ? ` · ${row.allocated} allocated` : ""}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+          <p className="text-sm text-muted-foreground">Stock lasts {data?.days_remaining ?? 0} days.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create SKU</CardTitle>
+          <CardDescription>Adds a sellable pack variant and inventory record.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitCreate}>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">SKU code</span>
+              <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="SM-MB-45" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Display name</span>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Slow Mo · 45 pack" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Pack qty</span>
+              <Input value={newPack} onChange={(e) => setNewPack(e.target.value)} inputMode="numeric" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Label</span>
+              <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Optional" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Price (₹)</span>
+              <Input value={newPrice} onChange={(e) => setNewPrice(e.target.value)} inputMode="numeric" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">MRP (₹)</span>
+              <Input value={newMrp} onChange={(e) => setNewMrp(e.target.value)} inputMode="numeric" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Opening stock</span>
+              <Input value={newStock} onChange={(e) => setNewStock(e.target.value)} inputMode="numeric" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Weekly forecast</span>
+              <Input value={newForecast} onChange={(e) => setNewForecast(e.target.value)} inputMode="numeric" />
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" size="sm" disabled={createSku.isPending}>
+                <PendingIcon pending={createSku.isPending} />
+                Create SKU
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Manual receipt</CardTitle>
+          <CardDescription>Add units to an existing SKU (creates an optional batch).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitReceipt}>
+            <label className="grid gap-1 text-sm sm:col-span-2">
+              <span className="text-muted-foreground">SKU</span>
+              <select
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                value={selectedSku}
+                onChange={(e) => setSku(e.target.value)}
+              >
+                {skus.map((row) => (
+                  <option key={row.sku} value={row.sku}>
+                    {row.sku} — {row.name || row.sku}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Quantity</span>
+              <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Batch code (optional)</span>
+              <Input value={batch} onChange={(e) => setBatch(e.target.value)} placeholder="B-2026-01" />
+            </label>
+            <label className="grid gap-1 text-sm sm:col-span-2">
+              <span className="text-muted-foreground">Note</span>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} />
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" size="sm" disabled={receive.isPending || !skus.length}>
+                <PendingIcon pending={receive.isPending} />
+                Receive stock
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {(data?.batches || []).length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Batches</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {data?.batches?.map((batchRow) => (
+              <div key={batchRow.b}>
+                {batchRow.b} · {batchRow.qty} · exp {batchRow.exp}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
   );
 }

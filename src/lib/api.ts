@@ -1,7 +1,9 @@
-import axios, { AxiosInstance } from "axios";
-import { clearTokens, readAccessToken } from "./authStorage";
+import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
+import { readAccessToken } from "./authStorage";
 import { env } from "./env";
 import { notifyError } from "./toast";
+
+type ApiRequestConfig = AxiosRequestConfig & { silent?: boolean };
 
 export function createApi(baseURL?: string, getToken: () => string = readAccessToken): AxiosInstance {
   const client = axios.create({ baseURL: baseURL || env.apiBaseUrl });
@@ -16,10 +18,10 @@ export function createApi(baseURL?: string, getToken: () => string = readAccessT
   client.interceptors.response.use(
     (response) => response,
     (error) => {
-      if (error.response?.status === 401) {
-        clearTokens();
+      // Do not clear tokens here — expired access still needs refresh for session restore.
+      if (!(error.config as ApiRequestConfig | undefined)?.silent) {
+        notifyError(error);
       }
-      notifyError(error);
       return Promise.reject(error);
     },
   );
@@ -82,8 +84,15 @@ export async function registerRequest(payload: {
   return data;
 }
 
-export async function meRequest(): Promise<User> {
-  const { data } = await api.get<User>("/auth/me");
+export async function meRequest(opts?: { silent?: boolean }): Promise<User> {
+  const { data } = await api.get<User>("/auth/me", { silent: opts?.silent } as ApiRequestConfig);
+  return data;
+}
+
+export async function refreshRequest(refreshToken: string, opts?: { silent?: boolean }): Promise<TokenPair> {
+  const { data } = await api.post<TokenPair>("/auth/refresh", { refresh_token: refreshToken }, {
+    silent: opts?.silent,
+  } as ApiRequestConfig);
   return data;
 }
 

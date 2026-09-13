@@ -4,15 +4,18 @@ import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoutes } from "../app/App";
 import { makeStore } from "../app/store";
-import { setSession } from "../features/auth/authSlice";
+import { clearSession, setSession } from "../features/auth/authSlice";
 import { patchDraft } from "../features/checkout/checkoutSlice";
+import { clearTokens } from "../lib/authStorage";
 import { CheckoutDraft } from "../lib/checkout";
 
 type Role = false | "founder" | "customer";
 
 export function renderApp(path = "/", role: Role = false, draft?: Partial<CheckoutDraft>) {
   cleanup();
+  clearTokens();
   const store = makeStore();
+  store.dispatch(clearSession());
   if (role) {
     store.dispatch(
       setSession({

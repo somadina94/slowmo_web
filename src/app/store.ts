@@ -1,8 +1,18 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { useDispatch, useSelector } from "react-redux";
-import { authReducer } from "../features/auth/authSlice";
+import { authReducer, type AuthState } from "../features/auth/authSlice";
 import { checkoutReducer } from "../features/checkout/checkoutSlice";
 import { uiReducer } from "../features/ui/uiSlice";
+import { readAccessToken } from "../lib/authStorage";
+
+function authPreload(): AuthState {
+  const accessToken = readAccessToken();
+  return {
+    user: null,
+    accessToken,
+    status: accessToken ? "booting" : "ready",
+  };
+}
 
 export function makeStore() {
   return configureStore({
@@ -10,6 +20,9 @@ export function makeStore() {
       auth: authReducer,
       checkout: checkoutReducer,
       ui: uiReducer,
+    },
+    preloadedState: {
+      auth: authPreload(),
     },
   });
 }
