@@ -39,6 +39,7 @@ env:
   GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
   WEB_PORT: ${{ vars.WEB_PORT || '5011' }}
   API_PORT: ${{ vars.API_PORT || '5012' }}
+  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
 jobs:
   verify:
@@ -246,6 +247,25 @@ jobs:
               sed -i.bak "s|^WEB_PORT=.*|WEB_PORT=${{ env.WEB_PORT }}|" .env
             else
               echo "WEB_PORT=${{ env.WEB_PORT }}" >> .env
+            fi
+
+            if [ -n "${{ env.VITE_API_BASE_URL }}" ]; then
+              if grep -q '^VITE_API_BASE_URL=' .env 2>/dev/null; then
+                sed -i.bak "s|^VITE_API_BASE_URL=.*|VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}|" .env
+              else
+                echo "VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}" >> .env
+              fi
+            fi
+
+            if ! grep -q '^VITE_API_BASE_URL=.' .env 2>/dev/null; then
+              echo "Server .env is missing VITE_API_BASE_URL — set it or add the GitHub Variable."
+              exit 1
+            fi
+
+            if grep -q '^VITE_APP_ENV=' .env 2>/dev/null; then
+              sed -i.bak "s|^VITE_APP_ENV=.*|VITE_APP_ENV=prod|" .env
+            else
+              echo "VITE_APP_ENV=prod" >> .env
             fi
 
             if [ -n "${{ secrets.GHCR_USERNAME }}" ] && [ -n "${{ secrets.GHCR_TOKEN }}" ]; then

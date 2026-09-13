@@ -4,7 +4,7 @@
 # Local build fallback: DEPLOY_BUILD_LOCAL=1 ./deploy.sh
 #
 # Requires `.env` on the server (copy from `.env.prod.example`).
-# VITE_API_BASE_URL is injected at container start into /env.js (runtime).
+# VITE_* vars are read from env_file at runtime and written into /env.js.
 
 name: slowmo-web-prod
 
@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in .env}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.example.invalid/api/v1}
         VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
         VITE_APP_ENV: prod
     image: ${SLOWMO_WEB_IMAGE:-slowmo-web:prod}
@@ -24,16 +24,12 @@ services:
       - '${WEB_PORT:-5011}:80'
     env_file:
       - .env
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in .env}
-      VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
-      VITE_APP_ENV: prod
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/']
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     networks:
       - slowmo-prod-network
 

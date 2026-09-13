@@ -33,7 +33,7 @@ export function Nav() {
         <div className="flex items-center gap-3">
           {user ? (
             <Link to={user.role === "customer" ? "/account" : "/admin"} className="nav-link">
-              {user.name.split(" ")[0]}
+              Dashboard
             </Link>
           ) : (
             <Link to="/login" className="nav-link">

@@ -370,7 +370,7 @@ test("account and admin", async () => {
   renderApp("/", "founder");
   fireEvent.click(screen.getByText(/Preorder —/));
   renderApp("/", "founder");
-  fireEvent.click(screen.getByText("Meera"));
+  fireEvent.click(screen.getByText("Dashboard"));
   renderApp("/admin", "founder");
   expect(await screen.findByText(/Good morning/)).toBeInTheDocument();
   renderApp("/admin/orders", "founder");
