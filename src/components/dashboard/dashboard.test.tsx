@@ -30,6 +30,7 @@ test("dashboard titles and nav state", () => {
   expect(pathTitle("/admin/analytics")).toBe("Analytics");
   expect(pathTitle("/admin/customers")).toBe("Customers");
   expect(pathTitle("/admin/inventory")).toBe("Inventory");
+  expect(pathTitle("/admin/team")).toBe("Team");
   expect(pathTitle("/admin")).toBe("");
   expect(pathTitle("/account")).toBe("");
   expect(isNavActive("/admin", "/admin", true)).toBe(true);

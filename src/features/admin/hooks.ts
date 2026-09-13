@@ -42,6 +42,7 @@ export function useAdminRequest() {
       void client.invalidateQueries({ queryKey: ["admin-orders"] });
       void client.invalidateQueries({ queryKey: ["admin-consults"] });
       void client.invalidateQueries({ queryKey: ["admin-dispatch"] });
+      void client.invalidateQueries({ queryKey: ["admin-staff"] });
     },
   });
 }

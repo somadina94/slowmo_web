@@ -11,6 +11,7 @@ import {
   AdminOrders,
   AdminOverview,
   AdminShell,
+  AdminTeam,
 } from "../pages/admin/AdminPages";
 import { LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage } from "../pages/auth/AuthPages";
 import { LandingPage } from "../pages/LandingPage";
@@ -68,6 +69,7 @@ export function AppRoutes() {
         <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="customers" element={<AdminCustomers />} />
         <Route path="inventory" element={<AdminInventory />} />
+        <Route path="team" element={<AdminTeam />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

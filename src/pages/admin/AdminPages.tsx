@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Boxes, Home, Phone, ShoppingCart, Truck, Users } from "lucide-react";
+import { BarChart3, Boxes, Home, Phone, ShoppingCart, Truck, UserCog, Users } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../app/store";
-import { useAdminMutation, useAdminQuery } from "../../features/admin/hooks";
+import { useAdminMutation, useAdminQuery, useAdminRequest } from "../../features/admin/hooks";
 import { setOrderFilter } from "../../features/ui/uiSlice";
 import { DashboardShell, type DashNavGroup } from "../../components/dashboard/DashboardShell";
 import { PendingIcon } from "../../components/PendingIcon";
@@ -11,7 +11,10 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import type { User } from "../../lib/api";
 import { statusClass, STATUS_LABEL } from "../../lib/status";
+
+const STAFF_ROLES = ["admin", "ops", "clinician", "founder"] as const;
 
 export function adminGroups(counts?: { orders?: number; consults?: number }): DashNavGroup[] {
   return [
@@ -30,6 +33,7 @@ export function adminGroups(counts?: { orders?: number; consults?: number }): Da
         { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
         { to: "/admin/customers", label: "Customers", icon: Users },
         { to: "/admin/inventory", label: "Inventory", icon: Boxes },
+        { to: "/admin/team", label: "Team", icon: UserCog },
       ],
     },
   ];
@@ -63,8 +67,13 @@ export function AdminOverview() {
           <h2 className="font-display text-2xl leading-tight">{data?.greeting || "Dashboard"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">Preorders, consults, and dispatch in one place.</p>
         </div>
-        <Button asChild variant={pending ? "default" : "outline"} size="sm">
-          <Link to="/admin/consults">
+        <Button
+          asChild
+          variant={pending ? "default" : "outline"}
+          size="sm"
+          className={pending ? "text-white" : undefined}
+        >
+          <Link to="/admin/consults" className={pending ? "text-white" : undefined}>
             {pending} pending consult{pending === 1 ? "" : "s"}
           </Link>
         </Button>
@@ -388,6 +397,173 @@ export function AdminCustomers() {
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+export function AdminTeam() {
+  const me = useAppSelector((state) => state.auth.user);
+  const { data, isError, isLoading } = useAdminQuery<User[]>(["admin-staff"], "/admin/staff");
+  const createStaff = useAdminMutation("/admin/staff", ["admin-staff"], "Team member added");
+  const action = useAdminRequest();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<string>("admin");
+
+  const roles = me?.role === "founder" ? STAFF_ROLES : STAFF_ROLES.filter((item) => item !== "founder");
+  const staff = data || [];
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !email.trim() || password.length < 8) return;
+    void createStaff
+      .mutateAsync({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim(),
+        role,
+      })
+      .then(() => {
+        setName("");
+        setEmail("");
+        setPassword("");
+        setPhone("");
+        setRole("admin");
+      });
+  };
+
+  const changeRole = (userId: number, nextRole: string) => {
+    void action.mutateAsync({
+      path: `/admin/staff/${userId}/role`,
+      method: "patch",
+      body: { role: nextRole },
+      success: "Role updated",
+    });
+  };
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading team…</p>;
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Team unavailable</CardTitle>
+          <CardDescription>Founder or admin access is required to manage roles.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Team</CardTitle>
+          <CardDescription>Staff accounts with dashboard access.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {staff.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No staff members yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staff.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell>{row.email}</TableCell>
+                    <TableCell>
+                      <select
+                        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                        value={row.role}
+                        disabled={action.isPending || (row.role === "founder" && me?.role !== "founder")}
+                        onChange={(event) => changeRole(row.id, event.target.value)}
+                      >
+                        {roles.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                        {row.role === "founder" && me?.role !== "founder" ? (
+                          <option value="founder">founder</option>
+                        ) : null}
+                      </select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Add team member</CardTitle>
+          <CardDescription>Creates a staff login for admin, ops, clinician, or founder.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Full name</span>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ada Admin" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Email</span>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                placeholder="ada@slowmo.co"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Password</span>
+              <Input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                placeholder="Min 8 characters"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Phone</span>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
+            </label>
+            <label className="grid gap-1 text-sm sm:col-span-2">
+              <span className="text-muted-foreground">Role</span>
+              <select
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+              >
+                {roles.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" size="sm" disabled={createStaff.isPending}>
+                <PendingIcon pending={createStaff.isPending} />
+                Add staff
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

@@ -51,6 +51,7 @@ export function pathTitle(pathname: string): string {
   if (pathname.startsWith("/admin/analytics")) return "Analytics";
   if (pathname.startsWith("/admin/customers")) return "Customers";
   if (pathname.startsWith("/admin/inventory")) return "Inventory";
+  if (pathname.startsWith("/admin/team")) return "Team";
   if (pathname.startsWith("/admin")) return "";
   return "";
 }

@@ -9,7 +9,7 @@ import { patchDraft } from "../features/checkout/checkoutSlice";
 import { clearTokens } from "../lib/authStorage";
 import { CheckoutDraft } from "../lib/checkout";
 
-type Role = false | "founder" | "customer";
+type Role = false | "founder" | "customer" | "admin" | "ops" | "clinician";
 
 export function renderApp(path = "/", role: Role = false, draft?: Partial<CheckoutDraft>) {
   cleanup();
@@ -17,15 +17,16 @@ export function renderApp(path = "/", role: Role = false, draft?: Partial<Checko
   const store = makeStore();
   store.dispatch(clearSession());
   if (role) {
+    const staff = role !== "customer";
     store.dispatch(
       setSession({
         user: {
           id: 1,
-          email: role === "founder" ? "meera@slowmo.co" : "priya@example.com",
-          name: role === "founder" ? "Meera Iyer" : "Priya Sharma",
+          email: staff ? "meera@slowmo.co" : "priya@example.com",
+          name: staff ? "Meera Iyer" : "Priya Sharma",
           phone: "",
           role,
-          initials: role === "founder" ? "MI" : "PS",
+          initials: staff ? "MI" : "PS",
         },
         accessToken: "a",
         refreshToken: "b",

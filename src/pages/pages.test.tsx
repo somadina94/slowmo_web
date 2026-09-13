@@ -162,6 +162,10 @@ function mockApiDefaults() {
     if (String(url).includes("/admin/analytics")) return { data: { kpis: [{ label: "Rev", value: "1" }] } };
     if (String(url).includes("/admin/customers"))
       return { data: { customers: [{ name: "A", email: "a@b.com", city: "X" }] } };
+    if (String(url).includes("/admin/staff"))
+      return {
+        data: [{ id: 1, email: "meera@slowmo.co", name: "Meera Iyer", phone: "", role: "founder", initials: "MI" }],
+      };
     if (String(url).includes("/admin/inventory"))
       return {
         data: {
@@ -448,6 +452,36 @@ test("account and admin", async () => {
   expect(await screen.findByText("Rev")).toBeInTheDocument();
   renderApp("/admin/customers", "founder");
   expect(await screen.findByText("A · X")).toBeInTheDocument();
+  renderApp("/admin/team", "founder");
+  expect(await screen.findByText("Add team member")).toBeInTheDocument();
+  expect((await screen.findAllByText("Meera Iyer")).length).toBeGreaterThan(0);
+  fireEvent.change(screen.getByPlaceholderText("Ada Admin"), { target: { value: "Ops Lead" } });
+  fireEvent.change(screen.getByPlaceholderText("ada@slowmo.co"), { target: { value: "ops@slowmo.co" } });
+  fireEvent.change(screen.getByPlaceholderText("Min 8 characters"), { target: { value: "password1" } });
+  fireEvent.change(screen.getByPlaceholderText("Optional"), { target: { value: "900" } });
+  fireEvent.change(screen.getByDisplayValue("admin"), { target: { value: "ops" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add staff" }));
+  await waitFor(() => expect(mockedApi.post).toHaveBeenCalled());
+  fireEvent.change(screen.getByDisplayValue("founder"), { target: { value: "admin" } });
+  await waitFor(() => expect(mockedApi.patch).toHaveBeenCalled());
+  mockedApi.get.mockImplementation(async (url: string) => {
+    if (String(url).includes("/admin/staff")) return { data: [] };
+    if (String(url).includes("/admin/counts")) return { data: { orders: 0, consults: 0 } };
+    return { data: {} };
+  });
+  renderApp("/admin/team", "founder");
+  expect(await screen.findByText(/No staff members yet/)).toBeInTheDocument();
+  mockedApi.get.mockRejectedValueOnce(new Error("forbidden"));
+  renderApp("/admin/team", "founder");
+  expect(await screen.findByText(/Team unavailable/)).toBeInTheDocument();
+  mockApiDefaults();
+  renderApp("/admin/team", "admin");
+  expect(await screen.findByText("Add team member")).toBeInTheDocument();
+  const founderSelect = screen.getByDisplayValue("founder") as HTMLSelectElement;
+  expect(founderSelect.disabled).toBe(true);
+  fireEvent.change(screen.getByPlaceholderText("Ada Admin"), { target: { value: "X" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add staff" }));
+  mockApiDefaults();
   renderApp("/admin/inventory", "founder");
   expect((await screen.findAllByText(/SM-MB-10/)).length).toBeGreaterThan(0);
   expect(await screen.findByText(/exp Dec 1/)).toBeInTheDocument();
