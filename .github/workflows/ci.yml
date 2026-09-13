@@ -45,6 +45,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Ensure brand assets are real files
+        run: |
+          test -s public/assets/slowmo-pouch.png
+          test -s public/assets/slowmo-logo.png
+          if head -c 20 public/assets/slowmo-pouch.png | grep -q 'git-lfs'; then
+            echo "LFS pointer checked out instead of image bytes"
+            exit 1
+          fi
 
       - name: Resolve API URL
         id: api_url
@@ -98,6 +109,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: Resolve API URL
         id: api_url
