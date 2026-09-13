@@ -4,11 +4,42 @@ export type AppEnv = {
   appEnv: string;
 };
 
-export function readEnv(source: Partial<Record<string, string>> = {}): AppEnv {
+export type RuntimeEnv = {
+  VITE_API_BASE_URL?: string;
+  VITE_RAZORPAY_KEY_ID?: string;
+  VITE_APP_ENV?: string;
+};
+
+declare global {
+  interface Window {
+    __SLOWMO_ENV__?: RuntimeEnv;
+  }
+}
+
+function pick(value: string | undefined): string {
+  return (value || "").trim();
+}
+
+/** Runtime container env wins over Vite build-time values. */
+export function mergeEnvSource(
+  vite: Partial<Record<string, string>>,
+  runtime: RuntimeEnv | undefined,
+): Partial<Record<string, string>> {
   return {
-    apiBaseUrl: source.VITE_API_BASE_URL || "http://localhost:5012/api/v1",
-    razorpayKeyId: source.VITE_RAZORPAY_KEY_ID || "",
-    appEnv: source.VITE_APP_ENV || "dev",
+    VITE_API_BASE_URL: pick(runtime?.VITE_API_BASE_URL) || pick(vite.VITE_API_BASE_URL),
+    VITE_RAZORPAY_KEY_ID: pick(runtime?.VITE_RAZORPAY_KEY_ID) || pick(vite.VITE_RAZORPAY_KEY_ID),
+    VITE_APP_ENV: pick(runtime?.VITE_APP_ENV) || pick(vite.VITE_APP_ENV),
+  };
+}
+
+export function readEnv(source: Partial<Record<string, string>> = {}): AppEnv {
+  const appEnv = pick(source.VITE_APP_ENV) || "dev";
+  const fromSource = pick(source.VITE_API_BASE_URL);
+  const apiBaseUrl = fromSource || (appEnv === "prod" ? "" : "http://localhost:5012/api/v1");
+  return {
+    apiBaseUrl,
+    razorpayKeyId: pick(source.VITE_RAZORPAY_KEY_ID),
+    appEnv,
   };
 }
 

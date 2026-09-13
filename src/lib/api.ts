@@ -3,9 +3,10 @@ import { clearTokens, readAccessToken } from "./authStorage";
 import { env } from "./env";
 import { notifyError } from "./toast";
 
-export function createApi(baseURL = env.apiBaseUrl, getToken: () => string = readAccessToken): AxiosInstance {
-  const client = axios.create({ baseURL });
+export function createApi(baseURL?: string, getToken: () => string = readAccessToken): AxiosInstance {
+  const client = axios.create({ baseURL: baseURL || env.apiBaseUrl });
   client.interceptors.request.use((config) => {
+    config.baseURL = baseURL || env.apiBaseUrl;
     const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

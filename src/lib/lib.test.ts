@@ -20,7 +20,7 @@ import {
   STATES,
   stepFromPath,
 } from "./checkout";
-import { readEnv } from "./env";
+import { mergeEnvSource, readEnv } from "./env";
 import { discount, FALLBACK_PACKS, FALLBACK_PROGRAMS, formatInr, packByQty, programByKey } from "./money";
 import { emptyAnswers, quizDone, toggleAnswer } from "./quiz";
 import { greeting, isStaffRole, statusClass, STATUS_LABEL } from "./status";
@@ -49,6 +49,20 @@ describe("lib", () => {
     expect(readEnv({ VITE_API_BASE_URL: "https://x", VITE_RAZORPAY_KEY_ID: "k", VITE_APP_ENV: "prod" }).appEnv).toBe(
       "prod",
     );
+    expect(readEnv({ VITE_APP_ENV: "prod" }).apiBaseUrl).toBe("");
+    expect(
+      mergeEnvSource(
+        { VITE_API_BASE_URL: "http://localhost:5012/api/v1", VITE_APP_ENV: "prod" },
+        { VITE_API_BASE_URL: "https://api.slowmo.jahbyte.com/api/v1" },
+      ).VITE_API_BASE_URL,
+    ).toBe("https://api.slowmo.jahbyte.com/api/v1");
+    expect(mergeEnvSource({ VITE_API_BASE_URL: "https://from-vite" }, undefined).VITE_API_BASE_URL).toBe(
+      "https://from-vite",
+    );
+    expect(
+      mergeEnvSource({ VITE_RAZORPAY_KEY_ID: "vite-key" }, { VITE_RAZORPAY_KEY_ID: "rt-key" }).VITE_RAZORPAY_KEY_ID,
+    ).toBe("rt-key");
+    expect(mergeEnvSource({ VITE_APP_ENV: "dev" }, { VITE_APP_ENV: "prod" }).VITE_APP_ENV).toBe("prod");
   });
 
   test("money helpers", () => {
@@ -152,6 +166,14 @@ describe("lib", () => {
     const bare = createApi("http://x", () => "");
     bare.defaults.adapter = async (config) => ({ data: {}, status: 200, statusText: "ok", headers: {}, config });
     await bare.get("/ok");
+    const fromEnv = createApi(undefined, () => "");
+    let seenBase = "";
+    fromEnv.defaults.adapter = async (config) => {
+      seenBase = String(config.baseURL || "");
+      return { data: {}, status: 200, statusText: "ok", headers: {}, config };
+    };
+    await fromEnv.get("/ok");
+    expect(seenBase).toBeTruthy();
     writeTokens("z", "y");
     expect(readAccessToken()).toBe("z");
     expect(readRefreshToken()).toBe("y");
