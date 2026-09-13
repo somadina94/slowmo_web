@@ -1,6 +1,7 @@
 import { useAppSelector } from "../../app/store";
 import { usePacks, usePrograms } from "../../features/catalog/hooks";
 import { discount, formatInr, packByQty, programByKey } from "../../lib/money";
+import pouchImage from "../../assets/slowmo-pouch.png";
 
 export function OrderSummary() {
   const draft = useAppSelector((state) => state.checkout);
@@ -14,7 +15,7 @@ export function OrderSummary() {
       <div className="eyebrow">Order summary</div>
       <div className="order-item mt-4">
         <div className="order-thumb">
-          <img src="/assets/slowmo-pouch.png" alt="pouch" />
+          <img src={pouchImage} alt="pouch" />
         </div>
         <div>
           <div className="font-semibold">Slow Mo Gummies</div>

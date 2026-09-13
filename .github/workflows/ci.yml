@@ -15,9 +15,10 @@
 #                            CI push uses GITHUB_TOKEN automatically
 #
 # Variables (Settings → Variables — NOT Secrets):
-#   VITE_API_BASE_URL      — e.g. https://api.slowmo.co/api/v1
+#   VITE_API_BASE_URL      — REQUIRED public API base, e.g. https://api.slowmo.jahbyte.com/api/v1
+#                            (baked into the JS bundle at image build time; .env on the server cannot change it)
 #   WEB_PORT               — optional host port published by compose (default 5011)
-#   API_PORT               — optional; used only for local fallback API URL
+#   API_PORT               — optional; unused for prod image URL (kept for local docs)
 # =============================================================================
 
 name: CI
@@ -50,10 +51,14 @@ jobs:
 
       - name: Ensure brand assets are real files
         run: |
+          test -s src/assets/slowmo-pouch.png
           test -s public/assets/slowmo-pouch.png
-          test -s public/assets/slowmo-logo.png
-          if head -c 20 public/assets/slowmo-pouch.png | grep -q 'git-lfs'; then
+          if head -c 20 src/assets/slowmo-pouch.png | grep -q 'git-lfs'; then
             echo "LFS pointer checked out instead of image bytes"
+            exit 1
+          fi
+          if head -c 20 public/assets/slowmo-pouch.png | grep -q 'git-lfs'; then
+            echo "LFS pointer checked out instead of image bytes in public/"
             exit 1
           fi
 
@@ -62,8 +67,15 @@ jobs:
         run: |
           URL="${{ vars.VITE_API_BASE_URL }}"
           if [ -z "$URL" ]; then
-            URL="http://127.0.0.1:${API_PORT}/api/v1"
+            echo "::error::Set repository Variable VITE_API_BASE_URL (e.g. https://api.slowmo.jahbyte.com/api/v1). It is baked into the web image at build time."
+            exit 1
           fi
+          case "$URL" in
+            http://localhost*|http://127.0.0.1*)
+              echo "::error::VITE_API_BASE_URL must be a public API URL for production builds, not localhost. Got: $URL"
+              exit 1
+              ;;
+          esac
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Baking VITE_API_BASE_URL=$URL"
 
@@ -117,8 +129,15 @@ jobs:
         run: |
           URL="${{ vars.VITE_API_BASE_URL }}"
           if [ -z "$URL" ]; then
-            URL="http://127.0.0.1:${API_PORT}/api/v1"
+            echo "::error::Set repository Variable VITE_API_BASE_URL (e.g. https://api.slowmo.jahbyte.com/api/v1)."
+            exit 1
           fi
+          case "$URL" in
+            http://localhost*|http://127.0.0.1*)
+              echo "::error::VITE_API_BASE_URL must be a public API URL for production builds, not localhost. Got: $URL"
+              exit 1
+              ;;
+          esac
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Image name

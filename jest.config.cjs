@@ -5,6 +5,7 @@ module.exports = {
   setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
   moduleNameMapper: {
     "\\.(css|less|scss)$": "identity-obj-proxy",
+    "\\.(png|jpg|jpeg|gif|webp|svg)$": "<rootDir>/src/test/file.mock.cjs",
     "^@/(.*)$": "<rootDir>/src/$1",
     "^lucide-react$": "<rootDir>/src/test/lucide.mock.cjs",
   },
@@ -31,6 +32,7 @@ module.exports = {
     "!src/main.tsx",
     "!src/vite-env.d.ts",
     "!src/test/**",
+    "!src/assets/**",
     "!src/components/ui/**",
     "!src/hooks/use-mobile.ts",
   ],

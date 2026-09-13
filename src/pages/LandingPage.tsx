@@ -7,6 +7,7 @@ import { Icon } from "../components/icons";
 import { Nav } from "../components/Nav";
 import { Sparkles } from "../components/Sparkles";
 import { emptyAnswers, QUIZ_QUESTIONS, quizDone, toggleAnswer } from "../lib/quiz";
+import pouchImage from "../assets/slowmo-pouch.png";
 
 export function LandingPage() {
   return (
@@ -76,7 +77,7 @@ export function Hero() {
                 { top: "62%", left: "94%", size: 20 },
               ]}
             />
-            <img className="hero-pouch" src="/assets/slowmo-pouch.png" alt="Slow Mo pouch" />
+            <img className="hero-pouch" src={pouchImage} alt="Slow Mo pouch" />
             <div className="hero-badge-float" style={{ top: "12%", right: "-2%" }}>
               🌙 Slower nights
             </div>

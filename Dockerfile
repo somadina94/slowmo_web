@@ -16,9 +16,11 @@ COPY index.html vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.jso
 COPY public ./public
 COPY src ./src
 
-ARG VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+ARG VITE_API_BASE_URL
 ARG VITE_RAZORPAY_KEY_ID=
 ARG VITE_APP_ENV=prod
+
+RUN test -n "$VITE_API_BASE_URL" || (echo "VITE_API_BASE_URL build-arg is required" && exit 1)
 
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
     VITE_RAZORPAY_KEY_ID=$VITE_RAZORPAY_KEY_ID \
