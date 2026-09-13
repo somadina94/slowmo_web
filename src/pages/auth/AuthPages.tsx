@@ -11,7 +11,7 @@ import {
   type LoginChallenge,
   type TokenPair,
 } from "../../lib/api";
-import { notifySuccess } from "../../lib/toast";
+import { notifySuccess, errorMessage } from "../../lib/toast";
 import { isStaffRole } from "../../lib/status";
 import { Nav } from "../../components/Nav";
 import { Footer } from "../../components/Footer";
@@ -155,8 +155,8 @@ export function RegisterPage() {
       const pair = await registerRequest({ name, email, password });
       notifySuccess("Account created");
       await finishAuth(pair, dispatch, navigate);
-    } catch {
-      setError("Could not register");
+    } catch (error) {
+      setError(errorMessage(error));
     } finally {
       setBusy(false);
     }

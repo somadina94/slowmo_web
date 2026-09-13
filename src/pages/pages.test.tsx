@@ -321,7 +321,7 @@ test("auth pages", async () => {
   fireEvent.change(screen.getByPlaceholderText("Email"), { target: { value: "a@b.com" } });
   fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "pw" } });
   fireEvent.click(screen.getByText("Register"));
-  await waitFor(() => expect(screen.getByText("Could not register")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("x")).toBeInTheDocument());
   (registerRequest as jest.Mock).mockResolvedValue({
     access_token: "a",
     refresh_token: "b",
