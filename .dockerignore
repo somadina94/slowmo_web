@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.prod.example
+!.env.dev.example
+.git
+.gitignore
+.DS_Store
+design_handoff_slowmo_wellness
+*.md

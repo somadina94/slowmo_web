@@ -1,0 +1,35 @@
+# Slow Mo Web — production
+#
+# Images are built on GitHub Actions and pulled from GHCR.
+# Local build fallback: DEPLOY_BUILD_LOCAL=1 ./deploy.sh
+#
+# Requires `.env` on the server (copy from `.env.prod.example`).
+
+name: slowmo-web-prod
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:5012/api/v1}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
+        VITE_APP_ENV: prod
+    image: ${SLOWMO_WEB_IMAGE:-slowmo-web:prod}
+    container_name: slowmo-web-prod
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-5011}:80'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - slowmo-prod-network
+
+networks:
+  slowmo-prod-network:
+    driver: bridge

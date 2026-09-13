@@ -1,0 +1,210 @@
+# =============================================================================
+# Slow Mo Web — build on GitHub (GHCR), deploy with SSH password
+# =============================================================================
+#
+# Secrets (Settings → Secrets):
+#   GHCR_USERNAME          — GitHub username for ghcr.io login
+#   GHCR_TOKEN             — PAT with write:packages (push) + read:packages
+#   SERVER_HOST            — deploy host
+#   SERVER_USERNAME        — SSH user
+#   SERVER_PASSWORD        — SSH password (not an SSH key)
+#   SERVER_PORT            — optional, default 22
+#   SERVER_DEPLOY_PATH     — optional, default /root/slowmo-web
+#   PAT_TOKEN              — optional GitHub PAT for git pull on the server
+#   VITE_RAZORPAY_KEY_ID   — live/test Razorpay key baked into the image
+#
+# Variables (Settings → Variables — NOT Secrets):
+#   VITE_API_BASE_URL      — e.g. https://api.slowmo.co/api/v1
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve API URL
+        id: api_url
+        run: |
+          URL="${{ vars.VITE_API_BASE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="http://127.0.0.1:5012/api/v1"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Baking VITE_API_BASE_URL=$URL"
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify web
+        run: npm run verify
+
+      - name: Validate Docker Compose (prod)
+        run: |
+          cp .env.prod.example .env
+          echo "SLOWMO_WEB_IMAGE=slowmo-web:test" >> .env
+          echo "VITE_API_BASE_URL=${{ steps.api_url.outputs.url }}" >> .env
+          docker compose -f docker-compose.prod.yml --env-file .env config
+
+      - name: Build web image
+        run: |
+          docker build -t slowmo-web:test \
+            --build-arg VITE_API_BASE_URL="${{ steps.api_url.outputs.url }}" \
+            --build-arg VITE_RAZORPAY_KEY_ID="${{ secrets.VITE_RAZORPAY_KEY_ID }}" \
+            --build-arg VITE_APP_ENV=prod \
+            .
+
+      - name: Ensure deploy script is executable
+        run: |
+          chmod +x deploy.sh
+          test -x deploy.sh
+
+  push-image:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve API URL
+        id: api_url
+        run: |
+          URL="${{ vars.VITE_API_BASE_URL }}"
+          if [ -z "$URL" ]; then
+            URL="http://127.0.0.1:5012/api/v1"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          no-cache: true
+          build-args: |
+            VITE_API_BASE_URL=${{ steps.api_url.outputs.url }}
+            VITE_RAZORPAY_KEY_ID=${{ secrets.VITE_RAZORPAY_KEY_ID }}
+            VITE_APP_ENV=prod
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  deploy:
+    needs: push-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: slowmo-web-prod-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          command_timeout: 30m
+          script: |
+            set -e
+
+            DEPLOY_PATH="${{ secrets.SERVER_DEPLOY_PATH }}"
+            if [ -z "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="/root/slowmo-web"
+            fi
+
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              echo "Deploy directory not found: $DEPLOY_PATH"
+              exit 1
+            fi
+
+            cd "$DEPLOY_PATH"
+
+            if [ -n "${{ secrets.PAT_TOKEN }}" ]; then
+              git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+              git fetch origin
+              git checkout "${{ github.ref_name }}"
+              git reset --hard "origin/${{ github.ref_name }}"
+              git clean -fd
+            fi
+
+            chmod +x ./deploy.sh
+
+            echo "Logging in to ghcr.io..."
+            if docker info >/dev/null 2>&1; then
+              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io \
+                -u "${{ secrets.GHCR_USERNAME }}" \
+                --password-stdin
+            else
+              echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io \
+                -u "${{ secrets.GHCR_USERNAME }}" \
+                --password-stdin
+            fi
+
+            export DEPLOY_BUILD_LOCAL=0
+            export SLOWMO_WEB_IMAGE="ghcr.io/${{ github.repository }}:latest"
+
+            if [ ! -f .env ]; then
+              echo "Missing .env on server at $DEPLOY_PATH — create it from .env.prod.example first."
+              exit 1
+            fi
+
+            if grep -q '^SLOWMO_WEB_IMAGE=' .env 2>/dev/null; then
+              sed -i.bak "s|^SLOWMO_WEB_IMAGE=.*|SLOWMO_WEB_IMAGE=${SLOWMO_WEB_IMAGE}|" .env
+            else
+              echo "SLOWMO_WEB_IMAGE=${SLOWMO_WEB_IMAGE}" >> .env
+            fi
+
+            if grep -q '^GHCR_USERNAME=' .env 2>/dev/null; then
+              sed -i.bak "s|^GHCR_USERNAME=.*|GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}|" .env
+            else
+              echo "GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}" >> .env
+            fi
+
+            if grep -q '^GHCR_TOKEN=' .env 2>/dev/null; then
+              sed -i.bak "s|^GHCR_TOKEN=.*|GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}|" .env
+            else
+              echo "GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}" >> .env
+            fi
+
+            rm -f .env.bak
+
+            docker rm -f slowmo-web-prod || true
+            ./deploy.sh

@@ -1,0 +1,60 @@
+# Slow Mo Web — local development
+#
+#   cp .env.dev.example .env.dev
+#   docker compose up --build --watch
+#
+# Web: http://localhost:5011
+# Point VITE_API_BASE_URL at the API (host-mapped port is fine from the browser).
+
+name: slowmo-web-dev
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: slowmo-web-dev
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-5011}:5173'
+    env_file:
+      - .env.dev
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5012/api/v1}
+      VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-rzp_test_placeholder}
+      VITE_APP_ENV: dev
+      CHOKIDAR_USEPOLLING: 'true'
+    command:
+      [
+        'npm',
+        'run',
+        'dev',
+        '--',
+        '--host',
+        '0.0.0.0',
+        '--port',
+        '5173',
+      ]
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./public
+          target: /app/public
+        - action: sync
+          path: ./index.html
+          target: /app/index.html
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./package-lock.json
+        - action: rebuild
+          path: ./Dockerfile.dev
+    networks:
+      - slowmo-dev-network
+
+networks:
+  slowmo-dev-network:
+    driver: bridge

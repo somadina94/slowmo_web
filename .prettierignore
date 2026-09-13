@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+package-lock.json
+*.tsbuildinfo
+design_handoff_slowmo_wellness
+docker-compose*.yml
+Dockerfile*
+nginx.conf
