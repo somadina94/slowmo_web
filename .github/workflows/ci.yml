@@ -3,8 +3,6 @@
 # =============================================================================
 #
 # Secrets (Settings → Secrets):
-#   GHCR_USERNAME          — GitHub username for ghcr.io login
-#   GHCR_TOKEN             — PAT with write:packages (push) + read:packages
 #   SERVER_HOST            — deploy host
 #   SERVER_USERNAME        — SSH user
 #   SERVER_PASSWORD        — SSH password (not an SSH key)
@@ -12,9 +10,14 @@
 #   SERVER_DEPLOY_PATH     — optional, default /root/slowmo-web
 #   PAT_TOKEN              — optional GitHub PAT for git pull on the server
 #   VITE_RAZORPAY_KEY_ID   — live/test Razorpay key baked into the image
+#   GHCR_USERNAME          — optional; defaults to github.actor
+#   GHCR_TOKEN             — optional PAT (read:packages) for server pulls;
+#                            CI push uses GITHUB_TOKEN automatically
 #
 # Variables (Settings → Variables — NOT Secrets):
 #   VITE_API_BASE_URL      — e.g. https://api.slowmo.co/api/v1
+#   WEB_PORT               — optional host port published by compose (default 5011)
+#   API_PORT               — optional; used only for local fallback API URL
 # =============================================================================
 
 name: CI
@@ -30,6 +33,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || github.actor }}
+  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+  WEB_PORT: ${{ vars.WEB_PORT || '5011' }}
+  API_PORT: ${{ vars.API_PORT || '5012' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -42,7 +51,7 @@ jobs:
         run: |
           URL="${{ vars.VITE_API_BASE_URL }}"
           if [ -z "$URL" ]; then
-            URL="http://127.0.0.1:5012/api/v1"
+            URL="http://127.0.0.1:${API_PORT}/api/v1"
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Baking VITE_API_BASE_URL=$URL"
@@ -64,6 +73,7 @@ jobs:
           cp .env.prod.example .env
           echo "SLOWMO_WEB_IMAGE=slowmo-web:test" >> .env
           echo "VITE_API_BASE_URL=${{ steps.api_url.outputs.url }}" >> .env
+          echo "WEB_PORT=${WEB_PORT}" >> .env
           docker compose -f docker-compose.prod.yml --env-file .env config
 
       - name: Build web image
@@ -94,16 +104,20 @@ jobs:
         run: |
           URL="${{ vars.VITE_API_BASE_URL }}"
           if [ -z "$URL" ]; then
-            URL="http://127.0.0.1:5012/api/v1"
+            URL="http://127.0.0.1:${API_PORT}/api/v1"
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ env.GHCR_USERNAME }}
+          password: ${{ env.GHCR_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -119,8 +133,8 @@ jobs:
             VITE_RAZORPAY_KEY_ID=${{ secrets.VITE_RAZORPAY_KEY_ID }}
             VITE_APP_ENV=prod
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
@@ -134,6 +148,10 @@ jobs:
       group: slowmo-web-prod-deploy
       cancel-in-progress: false
     steps:
+      - name: Image name
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -169,17 +187,17 @@ jobs:
 
             echo "Logging in to ghcr.io..."
             if docker info >/dev/null 2>&1; then
-              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io \
-                -u "${{ secrets.GHCR_USERNAME }}" \
+              echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io \
+                -u "${{ env.GHCR_USERNAME }}" \
                 --password-stdin
             else
-              echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io \
-                -u "${{ secrets.GHCR_USERNAME }}" \
+              echo "${{ env.GHCR_TOKEN }}" | sudo docker login ghcr.io \
+                -u "${{ env.GHCR_USERNAME }}" \
                 --password-stdin
             fi
 
             export DEPLOY_BUILD_LOCAL=0
-            export SLOWMO_WEB_IMAGE="ghcr.io/${{ github.repository }}:latest"
+            export SLOWMO_WEB_IMAGE="${{ steps.image.outputs.name }}:latest"
 
             if [ ! -f .env ]; then
               echo "Missing .env on server at $DEPLOY_PATH — create it from .env.prod.example first."
@@ -192,16 +210,23 @@ jobs:
               echo "SLOWMO_WEB_IMAGE=${SLOWMO_WEB_IMAGE}" >> .env
             fi
 
-            if grep -q '^GHCR_USERNAME=' .env 2>/dev/null; then
-              sed -i.bak "s|^GHCR_USERNAME=.*|GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}|" .env
+            if grep -q '^WEB_PORT=' .env 2>/dev/null; then
+              sed -i.bak "s|^WEB_PORT=.*|WEB_PORT=${{ env.WEB_PORT }}|" .env
             else
-              echo "GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}" >> .env
+              echo "WEB_PORT=${{ env.WEB_PORT }}" >> .env
             fi
 
-            if grep -q '^GHCR_TOKEN=' .env 2>/dev/null; then
-              sed -i.bak "s|^GHCR_TOKEN=.*|GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}|" .env
-            else
-              echo "GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}" >> .env
+            if [ -n "${{ secrets.GHCR_USERNAME }}" ] && [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
+              if grep -q '^GHCR_USERNAME=' .env 2>/dev/null; then
+                sed -i.bak "s|^GHCR_USERNAME=.*|GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}|" .env
+              else
+                echo "GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}" >> .env
+              fi
+              if grep -q '^GHCR_TOKEN=' .env 2>/dev/null; then
+                sed -i.bak "s|^GHCR_TOKEN=.*|GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}|" .env
+              else
+                echo "GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}" >> .env
+              fi
             fi
 
             rm -f .env.bak
