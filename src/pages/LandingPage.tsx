@@ -114,14 +114,51 @@ export function TrustBar() {
   );
 }
 
+function BenefitIllus({ type }: { type: "calm" | "sleep" | "balance" }) {
+  if (type === "calm") {
+    return (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden>
+        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2" />
+        <path d="M11 15c1 1.5 2 2 5 2s4-.5 5-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (type === "sleep") {
+    return (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden>
+        <path
+          d="M25 18a9 9 0 1 1-11-11 7 7 0 0 0 11 11z"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        <circle cx="10" cy="8" r="1" fill="currentColor" />
+        <circle cx="6" cy="14" r="0.8" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden>
+      <path d="M16 4v24M8 12h16M8 20h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="12" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
 export function Benefits() {
   const items = [
     {
+      type: "calm" as const,
       title: "Calm mind",
       desc: "The kind of quiet where your shoulders finally come down and to-do lists lose their volume.",
     },
-    { title: "Deep sleep", desc: "Fall asleep like a stone. Wake up like a sunrise. No 3AM stares at the ceiling." },
     {
+      type: "sleep" as const,
+      title: "Deep sleep",
+      desc: "Fall asleep like a stone. Wake up like a sunrise. No 3AM stares at the ceiling.",
+    },
+    {
+      type: "balance" as const,
       title: "Balanced you",
       desc: "The version of you that says yes to the walk, no to the fifth coffee, and means both.",
     },
@@ -140,7 +177,7 @@ export function Benefits() {
           {items.map((item) => (
             <div key={item.title} className="benefit-card">
               <div className="benefit-icon">
-                <Icon.Moon />
+                <BenefitIllus type={item.type} />
               </div>
               <h3>{item.title}</h3>
               <p>{item.desc}</p>
@@ -203,6 +240,152 @@ export function HowItWorks() {
   );
 }
 
+function IngLeaflet({
+  rot,
+  len,
+  w,
+  cx,
+  cy,
+  color,
+}: {
+  rot: number;
+  len: number;
+  w: number;
+  cx: number;
+  cy: number;
+  color: string;
+}) {
+  return (
+    <g transform={`translate(${cx} ${cy}) rotate(${rot})`}>
+      <path
+        d={`M 0 0 Q ${-w} ${-len * 0.35} ${-w * 0.5} ${-len * 0.75} Q 0 ${-len} ${w * 0.5} ${-len * 0.75} Q ${w} ${-len * 0.35} 0 0 Z`}
+        fill={color}
+      />
+      <line x1="0" y1="0" x2="0" y2={-len + 4} stroke="#0a2a20" strokeWidth="0.8" opacity="0.5" />
+      {[0.2, 0.4, 0.6, 0.8].map((t) => (
+        <g key={t}>
+          <path
+            d={`M ${-w * 0.5 * Math.sin(Math.PI * t)} ${-len * t} l -2 -3`}
+            stroke="#0a2a20"
+            strokeWidth="0.6"
+            opacity="0.4"
+            fill="none"
+          />
+          <path
+            d={`M ${w * 0.5 * Math.sin(Math.PI * t)} ${-len * t} l 2 -3`}
+            stroke="#0a2a20"
+            strokeWidth="0.6"
+            opacity="0.4"
+            fill="none"
+          />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function IngIllus() {
+  return (
+    <svg viewBox="0 0 400 400" width="78%" className="max-w-[400px]" aria-hidden>
+      <defs>
+        <linearGradient id="ing-stem-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#4a7859" />
+          <stop offset="100%" stopColor="#8A5A3B" />
+        </linearGradient>
+      </defs>
+
+      <g transform="translate(208 205) scale(0.86) translate(-200 -200)">
+        <path
+          d="M 200 350 Q 198 280 200 210 Q 202 150 200 80"
+          stroke="url(#ing-stem-grad)"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        <g transform="translate(200 280)">
+          <line x1="0" y1="0" x2="-45" y2="20" stroke="#4a7859" strokeWidth="2.5" strokeLinecap="round" />
+        </g>
+        <IngLeaflet rot={-130} len={55} w={14} cx={155} cy={300} color="#1B5240" />
+        <IngLeaflet rot={-110} len={65} w={16} cx={155} cy={300} color="#0F3B2E" />
+        <IngLeaflet rot={-90} len={75} w={18} cx={155} cy={300} color="#1B5240" />
+        <IngLeaflet rot={-70} len={65} w={16} cx={155} cy={300} color="#0F3B2E" />
+        <IngLeaflet rot={-50} len={55} w={14} cx={155} cy={300} color="#1B5240" />
+
+        <g transform="translate(200 280)">
+          <line x1="0" y1="0" x2="45" y2="20" stroke="#4a7859" strokeWidth="2.5" strokeLinecap="round" />
+        </g>
+        <IngLeaflet rot={-130} len={55} w={14} cx={245} cy={300} color="#0F3B2E" />
+        <IngLeaflet rot={-110} len={65} w={16} cx={245} cy={300} color="#1B5240" />
+        <IngLeaflet rot={-90} len={75} w={18} cx={245} cy={300} color="#0F3B2E" />
+        <IngLeaflet rot={-70} len={65} w={16} cx={245} cy={300} color="#1B5240" />
+        <IngLeaflet rot={-50} len={55} w={14} cx={245} cy={300} color="#0F3B2E" />
+
+        <g transform="translate(200 210)">
+          <line x1="0" y1="0" x2="-55" y2="10" stroke="#4a7859" strokeWidth="3" strokeLinecap="round" />
+          <line x1="0" y1="0" x2="55" y2="10" stroke="#4a7859" strokeWidth="3" strokeLinecap="round" />
+        </g>
+        <IngLeaflet rot={-150} len={55} w={14} cx={140} cy={220} color="#1B5240" />
+        <IngLeaflet rot={-130} len={75} w={18} cx={140} cy={220} color="#0F3B2E" />
+        <IngLeaflet rot={-110} len={95} w={22} cx={140} cy={220} color="#1B5240" />
+        <IngLeaflet rot={-90} len={110} w={24} cx={140} cy={220} color="#0F3B2E" />
+        <IngLeaflet rot={-70} len={95} w={22} cx={140} cy={220} color="#1B5240" />
+        <IngLeaflet rot={-50} len={75} w={18} cx={140} cy={220} color="#0F3B2E" />
+        <IngLeaflet rot={-30} len={55} w={14} cx={140} cy={220} color="#1B5240" />
+
+        <IngLeaflet rot={-150} len={55} w={14} cx={260} cy={220} color="#0F3B2E" />
+        <IngLeaflet rot={-130} len={75} w={18} cx={260} cy={220} color="#1B5240" />
+        <IngLeaflet rot={-110} len={95} w={22} cx={260} cy={220} color="#0F3B2E" />
+        <IngLeaflet rot={-90} len={110} w={24} cx={260} cy={220} color="#1B5240" />
+        <IngLeaflet rot={-70} len={95} w={22} cx={260} cy={220} color="#0F3B2E" />
+        <IngLeaflet rot={-50} len={75} w={18} cx={260} cy={220} color="#1B5240" />
+        <IngLeaflet rot={-30} len={55} w={14} cx={260} cy={220} color="#0F3B2E" />
+
+        <IngLeaflet rot={-145} len={50} w={12} cx={200} cy={100} color="#1B5240" />
+        <IngLeaflet rot={-125} len={70} w={16} cx={200} cy={100} color="#0F3B2E" />
+        <IngLeaflet rot={-105} len={90} w={20} cx={200} cy={100} color="#1B5240" />
+        <IngLeaflet rot={-85} len={90} w={20} cx={200} cy={100} color="#0F3B2E" />
+        <IngLeaflet rot={-65} len={70} w={16} cx={200} cy={100} color="#1B5240" />
+        <IngLeaflet rot={-45} len={50} w={12} cx={200} cy={100} color="#0F3B2E" />
+      </g>
+
+      <line
+        x1="118"
+        y1="168"
+        x2="72"
+        y2="148"
+        stroke="#0F3B2E"
+        strokeWidth="0.8"
+        strokeDasharray="2 2"
+        opacity="0.5"
+      />
+      <text x="48" y="142" fontSize="9" fill="#0F3B2E" opacity="0.65" fontFamily="var(--font-mono)">
+        FIG. 01
+      </text>
+      <text x="48" y="154" fontSize="8" fill="#0F3B2E" opacity="0.55" fontFamily="var(--font-mono)">
+        Palmate leaf
+      </text>
+
+      <line
+        x1="286"
+        y1="268"
+        x2="322"
+        y2="286"
+        stroke="#0F3B2E"
+        strokeWidth="0.8"
+        strokeDasharray="2 2"
+        opacity="0.5"
+      />
+      <text x="326" y="284" fontSize="9" fill="#0F3B2E" opacity="0.65" fontFamily="var(--font-mono)">
+        Vijaya
+      </text>
+      <text x="326" y="296" fontSize="7" fill="#0F3B2E" opacity="0.55" fontFamily="var(--font-mono)">
+        C. sativa
+      </text>
+    </svg>
+  );
+}
+
 export function Ingredients() {
   return (
     <section className="section" id="science">
@@ -235,10 +418,8 @@ export function Ingredients() {
             </div>
           </div>
           <div className="ing-visual">
-            <Sparkles items={[{ top: "12%", left: "18%" }]} />
-            <svg viewBox="0 0 400 400" width="82%" className="max-w-[440px]">
-              <path d="M 200 350 Q 198 280 200 80" stroke="#4a7859" strokeWidth="5" fill="none" />
-            </svg>
+            <Sparkles items={[{ top: "12%", left: "18%" }, { top: "70%", left: "78%" }, { top: "28%", left: "82%" }]} />
+            <IngIllus />
           </div>
         </div>
       </div>
@@ -257,8 +438,8 @@ export function SleepQuiz() {
         <div className="section-header">
           <div className="eyebrow">Sleep assessment</div>
           <h2 className="mt-3">
-            Two minutes.{" "}
-            <em style={{ color: "var(--purple)", fontStyle: "italic", fontWeight: 400 }}>Better nights.</em>
+            Two minutes to a{" "}
+            <em style={{ color: "var(--purple)", fontStyle: "italic", fontWeight: 400 }}>better night&apos;s sleep.</em>
           </h2>
         </div>
         <div className="quiz-card">

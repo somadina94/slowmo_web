@@ -632,6 +632,11 @@ body[data-palette="nocturnal"] .benefit-card {
   gap: 64px;
   align-items: center;
 }
+.ing-grid > :first-child {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
 .ing-visual {
   aspect-ratio: 1;
   background: radial-gradient(circle at 60% 40%, var(--lavender-soft), var(--cream-2));
@@ -639,7 +644,11 @@ body[data-palette="nocturnal"] .benefit-card {
   display: grid;
   place-items: center;
   position: relative;
+  z-index: 0;
   overflow: hidden;
+  max-width: 100%;
+  justify-self: end;
+  width: min(100%, 520px);
 }
 .ing-stats {
   display: grid;
