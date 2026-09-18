@@ -349,16 +349,7 @@ function IngIllus() {
         <IngLeaflet rot={-45} len={50} w={12} cx={200} cy={100} color="#0F3B2E" />
       </g>
 
-      <line
-        x1="118"
-        y1="168"
-        x2="72"
-        y2="148"
-        stroke="#0F3B2E"
-        strokeWidth="0.8"
-        strokeDasharray="2 2"
-        opacity="0.5"
-      />
+      <line x1="118" y1="168" x2="72" y2="148" stroke="#0F3B2E" strokeWidth="0.8" strokeDasharray="2 2" opacity="0.5" />
       <text x="48" y="142" fontSize="9" fill="#0F3B2E" opacity="0.65" fontFamily="var(--font-mono)">
         FIG. 01
       </text>
@@ -418,7 +409,13 @@ export function Ingredients() {
             </div>
           </div>
           <div className="ing-visual">
-            <Sparkles items={[{ top: "12%", left: "18%" }, { top: "70%", left: "78%" }, { top: "28%", left: "82%" }]} />
+            <Sparkles
+              items={[
+                { top: "12%", left: "18%" },
+                { top: "70%", left: "78%" },
+                { top: "28%", left: "82%" },
+              ]}
+            />
             <IngIllus />
           </div>
         </div>
