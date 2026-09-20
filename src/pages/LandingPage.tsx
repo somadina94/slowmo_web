@@ -19,7 +19,6 @@ export function LandingPage() {
       <HowItWorks />
       <Ingredients />
       <SleepQuiz />
-      <Testimonials />
       <FAQ />
       <Footer />
     </>
@@ -499,63 +498,6 @@ export function SleepQuiz() {
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function Testimonials() {
-  const items = [
-    {
-      quote: "I stopped counting my 3AM ceiling tiles. That's the whole review.",
-      name: "Ananya R.",
-      role: "Product designer, Bengaluru",
-      i: "A",
-    },
-    {
-      quote: "My Oura score jumped 14 points in three weeks. My wife noticed before I did.",
-      name: "Vikram S.",
-      role: "Founder, Mumbai",
-      i: "V",
-    },
-    {
-      quote: "The consult made the difference. Felt like actual medicine, not a wellness meme.",
-      name: "Priya M.",
-      role: "Radiologist, Delhi",
-      i: "P",
-    },
-  ];
-  return (
-    <section className="section section-forest">
-      <div className="container">
-        <div className="section-header">
-          <div className="eyebrow" style={{ color: "var(--sun)" }}>
-            Early access
-          </div>
-          <div className="wait-counter">
-            <span className="wait-num">2,847</span>
-            <span className="wait-label">people already pre-ordered</span>
-          </div>
-        </div>
-        <div className="testi-grid">
-          {items.map((item) => (
-            <div key={item.name} className="testi-card">
-              <div className="mb-4 flex gap-0.5 text-[color:var(--sun)]">
-                {[0, 1, 2, 3, 4].map((star) => (
-                  <Icon.Star key={star} />
-                ))}
-              </div>
-              <blockquote>"{item.quote}"</blockquote>
-              <div className="testi-meta">
-                <div className="testi-avatar">{item.i}</div>
-                <div>
-                  <div className="testi-name">{item.name}</div>
-                  <div className="testi-role">{item.role}</div>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </section>
